@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Earthquake Visualizer – last 24 h</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""/>
+    <!-- Tailwind for quick styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel for in-browser JSX -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""></script>
+    <!-- react-leaflet UMD build -->
+    <script src="https://unpkg.com/react-leaflet@4.2.1/umd/react-leaflet.js"></script>
+    <style>
+      .leaflet-container { height: 100vh; width: 100%; }
+    </style>
+  </head>
+  <body class="bg-gray-50">
+    <div id="root"></div>
+
+    <!-- -------------- APP -------------- -->
+    <script type="text/babel">
+      const { useEffect, useState } = React;
+      const { MapContainer, TileLayer, Marker, Popup, useMap } = window.ReactLeaflet;
+
+      const USGS = "https://earthquake.usgs.gov/earthquakes/feed/v1.0/summary/all_day.geojson";
+
+      function EarthquakeMarkers({ data }) {
+        return data.features.map(q => {
+          const [lng, lat] = q.geometry.coordinates;
+          const mag = q.properties.mag ?? 0;
+          const place = q.properties.place ?? "Unknown location";
+          return (
+            <Marker
+              key={q.id}
+              position={[lat, lng]}
+              eventHandlers={{
+                click() {
+                  console.log(q.properties);
+                },
+              }}
+            >
+              <Popup>
+                <div className="text-sm">
+                  <div className="font-bold">{mag.toFixed(1)} magnitude</div>
+                  <div>{place}</div>
+                  <div className="text-gray-500 text-xs">
+                    {new Date(q.properties.time).toLocaleString()}
+                  </div>
+                </div>
+              </Popup>
+            </Marker>
+          );
+        });
+      }
+
+      function FitBounds({ data }) {
+        const map = useMap();
+        useEffect(() => {
+          if (!data) return;
+          const group = new window.L.featureGroup(
+            data.features.map(f => {
+              const [lng, lat] = f.geometry.coordinates;
+              return window.L.marker([lat, lng]);
+            })
+          );
+          map.fitBounds(group.getBounds().pad(0.05), { animate: true });
+        }, [data, map]);
+        return null;
+      }
+
+      function Loader() {
+        return (
+          <div className="absolute top-4 left-4 z-[1000] bg-white/90 px-3 py-2 rounded shadow">
+            Loading latest earthquakes…
+          </div>
+        );
+      }
+
+      function ErrorBanner({ msg }) {
+        return (
+          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-[1000] bg-red-100 text-red-800 px-4 py-2 rounded shadow">
+            {msg}
+          </div>
+        );
+      }
+
+      function App() {
+        const [eq, setEq] = useState(null);
+        const [error, setError] = useState("");
+
+        useEffect(() => {
+          fetch(USGS)
+            .then(r => {
+              if (!r.ok) throw new Error("Network response was not ok");
+              return r.json();
+            })
+            .then(setEq)
+            .catch(err => setError(err.message));
+        }, []);
+
+        if (error) return <ErrorBanner msg={error} />;
+        if (!eq) return <Loader />;
+
+        return (
+          <MapContainer center={[20, 0]} zoom={2} scrollWheelZoom={true}>
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OSM</a>'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            <EarthquakeMarkers data={eq} />
+            <FitBounds data={eq} />
+          </MapContainer>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+    </script>
+  </body>
+</html>
