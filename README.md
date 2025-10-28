@@ -1,5 +1,4 @@
 # Earthquake-Visualizer
-# Earthquake Visualizer – React + Leaflet
 
 A single-file, zero-build web app that shows every earthquake recorded by USGS in the past 24 h.
 
